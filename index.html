@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AirSensor - 쾌적한 숙소 찾기</title>
+  <!-- Chart.js 라이브러리 로드 -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  <style>
+    /* 폰트 및 기본 설정 */
+    @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+    
+    body {
+      font-family: 'Pretendard', sans-serif;
+      background-color: #f7f7f7;
+      margin: 0;
+      padding: 0;
+      color: #222222;
+    }
+    
+    /* 헤더 */
+    header {
+      background-color: #ffffff;
+      padding: 20px 40px;
+      box-shadow: 0 1px 12px rgba(0,0,0,0.05);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    h1 {
+      margin: 0;
+      color: #ff385c;
+      font-size: 24px;
+      font-weight: 800;
+    }
+    
+    /* 정렬 및 필터 도구바 */
+    .toolbar {
+      background: white;
+      padding: 15px 40px;
+      border-bottom: 1px solid #ebebeb;
+      display: flex;
+      gap: 20px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .filter-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .filter-group input[type="range"] {
+      cursor: pointer;
+    }
+    .btn {
+      padding: 8px 16px;
+      border-radius: 20px;
+      border: 1px solid #dddddd;
+      background: white;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+    .btn.active {
+      background: #222;
+      color: white;
+      border-color: #222;
+    }
+    select {
+      padding: 8px 15px;
+      border-radius: 20px;
+      border: 1px solid #dddddd;
+      font-weight: 600;
+      cursor: pointer;
+      outline: none;
+    }
+    .active-tag-label {
+      color: #ff385c;
+      font-weight: 700;
+      margin-left: 10px;
+      display: none;
+    }
+
+    /* 메인 히어로 배너 */
+    .hero {
+      background: linear-gradient(to right, rgba(0,0,0,0.6), rgba(0,0,0,0.2)), url('https://images.unsplash.com/photo-1499793983690-e29da59ef1c2?w=1600&q=80') center/cover;
+      height: 250px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      color: white;
+      text-align: center;
+      padding: 0 20px;
+    }
+    .hero h2 { font-size: 32px; margin: 0 0 10px 0; }
+    .hero p { font-size: 16px; margin: 0; opacity: 0.9; }
+    
+    /* 컨테이너 및 그리드 */
+    .container { max-width: 1200px; margin: 40px auto; padding: 0 20px; }
+    .section-title { font-size: 22px; font-weight: 700; margin-bottom: 20px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 30px; }
+    
+    /* 카드 스타일 */
+    .card {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.04);
+      transition: transform 0.2s, box-shadow 0.2s;
+      border: 1px solid #ebebeb;
+      overflow: hidden; 
+      display: flex;
+      flex-direction: column;
+      cursor: pointer; /* 클릭 유도 */
+    }
+    .card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
+    .room-image { width: 100%; height: 220px; object-fit: cover; background-color: #eee; }
+    .card-content { padding: 20px; }
+    
+    .card-title { font-size: 18px; font-weight: 700; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+    .badge { font-size: 12px; padding: 4px 8px; border-radius: 12px; font-weight: 600; }
+    .badge.excellent { background: #e8f5e9; color: #2e7d32; }
+    .badge.good { background: #fff8e1; color: #f57f17; }
+    .badge.poor { background: #ffebee; color: #c62828; }
+
+    /* 추천대상 태그 */
+    .tags { display: flex; gap: 6px; margin-bottom: 15px; flex-wrap: wrap; }
+    .tag { font-size: 12px; color: #555; background-color: #f1f1f1; padding: 4px 8px; border-radius: 4px; z-index: 10; cursor: pointer; transition: background 0.2s; }
+    .tag:hover { background-color: #ddd; }
+
+    /* 가격 및 센서 데이터 */
+    .price-row { font-size: 16px; margin-bottom: 15px; color: #222; }
+    .price-row strong { font-size: 18px; }
+    .sensor-data { background: #f9f9f9; padding: 12px; border-radius: 10px; }
+    .stat-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px; color: #717171; }
+    .stat-row:last-child { margin-bottom: 0; }
+    .stat-val { font-weight: 600; color: #222222; }
+    .score-bar-bg { width: 100%; height: 6px; background: #e0e0e0; border-radius: 3px; margin-top: 6px; overflow: hidden; }
+    .score-bar-fill { height: 100%; border-radius: 3px; transition: width 0.5s ease-in-out; }
+
+    /* 모달 (상세페이지 차트) 스타일 */
+    .modal-overlay {
+      display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;
+      backdrop-filter: blur(4px);
+    }
+    .modal-content {
+      background: white; width: 90%; max-width: 700px; border-radius: 20px;
+      padding: 30px; position: relative; box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+    }
+    .modal-close {
+      position: absolute; top: 20px; right: 20px; font-size: 24px; cursor: pointer;
+      background: #f1f1f1; width: 36px; height: 36px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .modal-title { font-size: 24px; font-weight: 700; margin-bottom: 5px; margin-top: 0; }
+    .modal-subtitle { color: #717171; font-size: 14px; margin-bottom: 20px; }
+    canvas { max-height: 350px; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>✈ AirSensor</h1>
+    <div>
+      <select id="sortSelect" onchange="renderRooms()">
+        <option value="overall">✨ 종합 쾌적순</option>
+        <option value="temp">🌡️ 온/습도 쾌적순</option>
+        <option value="light">💡 조도순</option>
+        <option value="price_low">💰 낮은 가격순</option>
+      </select>
+    </div>
+  </header>
+
+  <!-- 필터 툴바 -->
+  <div class="toolbar">
+    <div class="filter-group">
+      <label>💰 1박 요금:</label>
+      <input type="range" id="priceFilter" min="50000" max="300000" step="10000" value="300000" oninput="updatePriceLabel(); renderRooms();">
+      <span id="priceLabel">전체</span>
+    </div>
+    <div class="filter-group">
+      <button class="btn" id="btnExcellent" onclick="toggleExcellentFilter()">🌿 '매우 쾌적'만 보기</button>
+      <button class="btn" onclick="clearFilters()" style="color: #717171; border-color: transparent;">초기화</button>
+      <span class="active-tag-label" id="activeTagLabel"></span>
+    </div>
+  </div>
+
+  <div class="hero">
+    <h2>데이터가 증명하는 완벽한 휴식</h2>
+    <p>IoT 센서가 실시간으로 측정하는 온도, 습도, 조도를 바탕으로 나에게 딱 맞는 숙소를 찾아보세요.</p>
+  </div>
+
+  <div class="container">
+    <div class="section-title">실시간 측정 숙소 리스트 <span id="roomCount" style="font-size: 16px; font-weight: normal; color: #717171;"></span></div>
+    <div class="grid" id="roomGrid">
+      <!-- 카드가 렌더링되는 영역 -->
+    </div>
+  </div>
+
+  <!-- 차트 모달 -->
+  <div class="modal-overlay" id="roomModal" onclick="closeModal(event)">
+    <div class="modal-content" onclick="event.stopPropagation()">
+      <div class="modal-close" onclick="closeModal(event)">✕</div>
+      <h2 class="modal-title" id="modalRoomName">숙소 이름</h2>
+      <p class="modal-subtitle">최근 24시간 온도 및 습도 변화 그래프 (IoT 실시간 로깅)</p>
+      <canvas id="roomChart"></canvas>
+    </div>
+  </div>
+
+  <script>
+    let rooms = [];
+    let chartInstance = null; // Chart.js 인스턴스 보관용
+
+    // 필터 상태
+    let filterState = {
+      maxPrice: 300000,
+      onlyExcellent: false,
+      activeTag: null
+    };
+    
+    // 데이터 (매우 쾌적한 신규 숙소 3개 포함)
+    const roomData = [
+      { name: "아늑한 홍대 스튜디오", img: "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=600&q=80", price: 65000, tags: ["#나홀로여행", "#도심속휴식"] },
+      { name: "강남 파노라마 뷰", img: "https://dynamic-media-cdn.tripadvisor.com/media/photo-o/1c/e1/ec/80/studio-superior.jpg?w=1200&h=-1&s=1", price: 120000, tags: ["#시티뷰", "#비즈니스"] },
+      { name: "제주 감성 독채", img: "https://images.unsplash.com/photo-1499916078039-922301b0eb9b?w=600&q=80", price: 210000, tags: ["#가족여행", "#힐링"] },
+      { name: "부산 오션뷰 테라스", img: "https://images.unsplash.com/photo-1499793983690-e29da59ef1c2?w=600&q=80", price: 155000, tags: ["#커플추천", "#바다앞"] },
+      { name: "이태원 루프탑", img: "https://offloadmedia.feverup.com/secretseoul.com/wp-content/uploads/2023/05/07205648/Untitled-design-19.png", price: 95000, tags: ["#파티룸", "#루프탑"] },
+      { name: "북촌 한옥 스테이", img: "https://cf.bstatic.com/xdata/images/hotel/max1024x768/619707276.webp?k=9cf7d718e05fd1ed38fcbc744d4da6e605b995c7daf5ecd2fe75dd76686c19dc&o=", price: 180000, tags: ["#전통가옥", "#조용한분위기"] },
+      { name: "성수 힙스터룸", img: "https://images.unsplash.com/photo-1554995207-c18c203602cb?w=600&q=80", price: 78000, tags: ["#인테리어", "#작업하기좋은"] },
+      { name: "광안리 해변 앞", img: "https://cf.bstatic.com/xdata/images/hotel/max1024x768/117339302.jpg?k=cafe09480cfc29272d206599c864892970ee7ef8b1b737505baafcb7e18511f2&o=", price: 140000, tags: ["#일출명소", "#반려견동반"] },
+      { name: "속초 소나무숲 펜션", img: "https://images.unsplash.com/photo-1510798831971-661eb04b3739?w=600&q=80", price: 110000, tags: ["#피톤치드", "#공기청정"] },
+      
+      // ★ 신규 추가: '매우 쾌적' 데이터를 보장하는 숙소 3개
+      { name: "남산 스파 라운지", img: "https://www.ahstatic.com/photos/b1v3_rosla_02_p_1024x768.jpg", price: 135000, tags: ["#스파", "#야경", "#반려견동반"], fixedTemp: 22.1, fixedHum: 49, fixedLight: 510 },
+      { name: "판교 스마트 워케이션", img: "https://images.unsplash.com/photo-1505691938895-1758d7feb511?w=600&q=80", price: 89000, tags: ["#워케이션", "#IoT", "#비즈니스"], fixedTemp: 21.8, fixedHum: 51, fixedLight: 495 },
+      { name: "양양 서퍼스 코티지", img: "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=600&q=80", price: 75000, tags: ["#해변", "#가성비"], fixedTemp: 22.5, fixedHum: 48, fixedLight: 500 }
+    ];
+
+    function generateRoom(id, data) {
+      return {
+        id: id,
+        name: data.name,
+        image: data.img,
+        price: data.price,
+        tags: data.tags,
+        // fixed 데이터가 있으면 그것을, 없으면 난수 생성
+        temp: data.fixedTemp !== undefined ? data.fixedTemp : (Math.random() * 14 + 15), 
+        hum: data.fixedHum !== undefined ? data.fixedHum : Math.floor(Math.random() * 60 + 20),
+        light: data.fixedLight !== undefined ? data.fixedLight : Math.floor(Math.random() * 900 + 50) 
+      };
+    }
+
+    // 데이터 초기화
+    for(let i=0; i<roomData.length; i++) {
+      rooms.push(generateRoom(i+1, roomData[i]));
+    }
+
+    // 쾌적도 계산
+    function calculateScores(room) {
+      const t = room.temp !== -1 ? room.temp : 999;
+      const h = room.hum !== -1 ? room.hum : 999;
+      const l = room.light !== -1 ? room.light : 9999;
+
+      room.tempScore = Math.abs(t - 22) + Math.abs(h - 50) * 0.2; 
+      room.lightScore = Math.abs(l - 500);
+      room.overallScore = (room.tempScore * 20) + (room.lightScore * 0.1);
+      
+      if(room.overallScore < 85) room.grade = 'excellent';
+      else if (room.overallScore > 170) room.grade = 'poor';
+      else room.grade = 'good';
+    }
+
+    // 필터 UI 업데이트
+    function updatePriceLabel() {
+      const val = document.getElementById('priceFilter').value;
+      filterState.maxPrice = parseInt(val);
+      document.getElementById('priceLabel').innerText = filterState.maxPrice >= 300000 ? "전체" : `₩${filterState.maxPrice.toLocaleString()} 이하`;
+    }
+
+    function toggleExcellentFilter() {
+      filterState.onlyExcellent = !filterState.onlyExcellent;
+      document.getElementById('btnExcellent').classList.toggle('active');
+      renderRooms();
+    }
+
+    function setTagFilter(tag, event) {
+      event.stopPropagation(); // 카드 클릭(모달 오픈) 방지
+      filterState.activeTag = tag;
+      const tagLabel = document.getElementById('activeTagLabel');
+      tagLabel.style.display = 'inline';
+      tagLabel.innerText = `${tag} 필터 적용 중 ✕`;
+      tagLabel.onclick = () => { filterState.activeTag = null; renderRooms(); };
+      renderRooms();
+    }
+
+    function clearFilters() {
+      filterState.maxPrice = 300000;
+      filterState.onlyExcellent = false;
+      filterState.activeTag = null;
+      document.getElementById('priceFilter').value = 300000;
+      updatePriceLabel();
+      document.getElementById('btnExcellent').classList.remove('active');
+      document.getElementById('activeTagLabel').style.display = 'none';
+      renderRooms();
+    }
+
+    // 화면 렌더링
+    function renderRooms() {
+      const grid = document.getElementById('roomGrid');
+      grid.innerHTML = ''; 
+      
+      const criteria = document.getElementById('sortSelect').value;
+      
+      // 1. 계산 및 필터링
+      let displayRooms = rooms.filter(room => {
+        calculateScores(room);
+        if(room.price > filterState.maxPrice) return false;
+        if(filterState.onlyExcellent && room.grade !== 'excellent') return false;
+        if(filterState.activeTag && !room.tags.includes(filterState.activeTag)) return false;
+        return true;
+      });
+
+      // 2. 정렬
+      displayRooms.sort((a, b) => {
+        if(criteria === 'overall') return a.overallScore - b.overallScore;
+        if(criteria === 'temp') return a.tempScore - b.tempScore;
+        if(criteria === 'light') return a.lightScore - b.lightScore;
+        if(criteria === 'price_low') return a.price - b.price;
+      });
+
+      document.getElementById('roomCount').innerText = `(${displayRooms.length}개 숙소)`;
+
+      // 3. 카드 생성
+      displayRooms.forEach(room => {
+        let badgeText = room.grade === 'excellent' ? '매우 쾌적 🌿' : (room.grade === 'poor' ? '주의 필요 ⚠️' : '보통');
+        
+        const tempText = `${room.temp.toFixed(1)}°C`;
+        const humText = `${Math.round(room.hum)}%`;
+        const lightText = `${Math.round(room.light)} Lux`;
+        const lightPercent = Math.min(100, Math.max(0, Math.round((room.light / 1023) * 100)));
+
+        const tagsHTML = room.tags.map(tag => `<span class="tag" onclick="setTagFilter('${tag}', event)">${tag}</span>`).join('');
+
+        const cardHTML = `
+          <div class="card" onclick="openChartModal('${room.id}')">
+            <img src="${room.image}" alt="${room.name}" class="room-image" loading="lazy">
+            <div class="card-content">
+              <div class="card-title">
+                ${room.name} ${room.id === 1 ? '📡' : ''}
+                <span class="badge ${room.grade}">${badgeText}</span>
+              </div>
+              <div class="tags">${tagsHTML}</div>
+              <div class="price-row"><strong>₩${room.price.toLocaleString()}</strong> / 박</div>
+              <div class="sensor-data">
+                <div class="stat-row"><span>🌡️ 온도</span><span class="stat-val">${tempText}</span></div>
+                <div class="stat-row"><span>💧 습도</span><span class="stat-val">${humText}</span></div>
+                <div class="stat-row" style="flex-direction: column; margin-top: 5px;">
+                  <div style="display:flex; justify-content: space-between;">
+                    <span>💡 조도</span><span class="stat-val">${lightText}</span>
+                  </div>
+                  <div class="score-bar-bg"><div class="score-bar-fill" style="width: ${lightPercent}%; background: #ffb300;"></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+        grid.innerHTML += cardHTML;
+      });
+    }
+
+    // 모달 및 차트 기능
+    function openChartModal(roomId) {
+      const room = rooms.find(r => r.id == roomId);
+      if(!room) return;
+
+      document.getElementById('modalRoomName').innerText = room.name;
+      document.getElementById('roomModal').style.display = 'flex';
+      
+      // 24시간 가짜 데이터 생성 (현재 방의 온습도를 기준으로 흐름 생성)
+      const labels = Array.from({length: 24}, (_, i) => `${i}:00`);
+      const tempData = [];
+      const humData = [];
+      let baseTemp = room.temp;
+      let baseHum = room.hum;
+
+      for(let i=0; i<24; i++) {
+        // 새벽에는 온도가 떨어지고, 낮에는 오르는 가상의 곡선 추가
+        const timeOffset = Math.sin((i - 6) / 24 * Math.PI * 2) * 2; 
+        tempData.push(baseTemp + timeOffset + (Math.random() - 0.5));
+        humData.push(baseHum + (Math.random() * 4 - 2));
+      }
+
+      drawChart(labels, tempData, humData);
+    }
+
+    function closeModal(e) {
+      document.getElementById('roomModal').style.display = 'none';
+    }
+
+    function drawChart(labels, temp, hum) {
+      const ctx = document.getElementById('roomChart').getContext('2d');
+      
+      // 기존 차트가 있으면 파괴하고 새로 그림
+      if(chartInstance) {
+        chartInstance.destroy();
+      }
+
+      chartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: '온도 (°C)',
+              data: temp,
+              borderColor: '#ff385c',
+              backgroundColor: 'rgba(255, 56, 92, 0.1)',
+              yAxisID: 'y',
+              fill: true,
+              tension: 0.4
+            },
+            {
+              label: '습도 (%)',
+              data: hum,
+              borderColor: '#00a699',
+              backgroundColor: 'rgba(0, 166, 153, 0.1)',
+              yAxisID: 'y1',
+              fill: true,
+              tension: 0.4
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          interaction: { mode: 'index', intersect: false },
+          scales: {
+            y: {
+              type: 'linear', display: true, position: 'left',
+              title: { display: true, text: '온도 (°C)' }
+            },
+            y1: {
+              type: 'linear', display: true, position: 'right',
+              title: { display: true, text: '습도 (%)' },
+              grid: { drawOnChartArea: false }
+            }
+          }
+        }
+      });
+    }
+
+    // ESP8266 실시간 연동 (ID:1)
+    function fetchRealData() {
+      fetch('http://192.168.4.1/data') 
+        .then(res => res.json())
+        .then(data => {
+          const realRoom = rooms.find(r => r.id === 1);
+          if(realRoom) {
+            realRoom.temp = data.temp;
+            realRoom.hum = data.hum;
+            realRoom.light = data.light; 
+            realRoom.name = "홍대 힙스터 룸✨실시간 측정";
+          }
+          renderRooms(); 
+        })
+        .catch(err => {
+          // console.log("보드 연결 대기 중...");
+        });
+    }
+
+    // 초기 실행
+    updatePriceLabel();
+    renderRooms(); 
+    setInterval(fetchRealData, 3000); 
+  </script>
+</body>
+</html>
